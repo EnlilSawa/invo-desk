@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { InvoiceFormData } from '@/types/invoice';
 import { generateInvoicePDF, downloadPDF } from '@/utils/pdfGenerator';
 import { sendInvoiceEmail, generateEmailContent, generateEmailTemplate } from '@/utils/emailService';
-import { generateSignatureLink, generateInvoiceId } from '@/utils/signatureService';
+import { generateSignatureLink, generateInvoiceId, createDocuSignEnvelope, isDocuSignConfigured } from '@/utils/signatureService';
 
 const initialFormData: InvoiceFormData = {
   // Client Information
@@ -49,19 +49,22 @@ export default function InvoiceForm() {
   const [emailSent, setEmailSent] = useState(false);
   const [signatureLink, setSignatureLink] = useState('');
   const [emailTemplate, setEmailTemplate] = useState('');
+  const isTypingRef = useRef(false);
 
   // Calculate totals when rate or hours change
   useEffect(() => {
-    const totalAmount = formData.hourlyRate * formData.totalHours;
-    const taxAmount = totalAmount * (formData.taxRate / 100);
-    const finalAmount = totalAmount + taxAmount;
-    
-    setFormData(prev => ({
-      ...prev,
-      totalAmount,
-      taxAmount,
-      finalAmount,
-    }));
+    if (!isTypingRef.current) {
+      const totalAmount = formData.hourlyRate * formData.totalHours;
+      const taxAmount = totalAmount * (formData.taxRate / 100);
+      const finalAmount = totalAmount + taxAmount;
+      
+      setFormData(prev => ({
+        ...prev,
+        totalAmount,
+        taxAmount,
+        finalAmount,
+      }));
+    }
   }, [formData.hourlyRate, formData.totalHours, formData.taxRate]);
 
   const handleStringInputChange = (field: keyof InvoiceFormData, value: string) => {
@@ -80,6 +83,7 @@ export default function InvoiceForm() {
   };
 
   const handleNumberInputChange = (field: keyof InvoiceFormData, value: string) => {
+    isTypingRef.current = true;
     const numValue = parseFloat(value) || 0;
     setFormData(prev => ({
       ...prev,
@@ -93,6 +97,11 @@ export default function InvoiceForm() {
         [field]: undefined,
       }));
     }
+    
+    // Reset typing flag after a short delay
+    setTimeout(() => {
+      isTypingRef.current = false;
+    }, 100);
   };
 
   const validateForm = (): boolean => {
@@ -149,9 +158,23 @@ export default function InvoiceForm() {
       // Generate PDF
       const pdfBytes = await generateInvoicePDF(formData);
       
-      // Create signature link
-      const invoiceId = generateInvoiceId();
-      const signatureLink = generateSignatureLink(invoiceId);
+      let signatureLink = '';
+      let docusignEnvelope = null;
+      
+      // Try to create DocuSign envelope if configured
+      if (isDocuSignConfigured()) {
+        docusignEnvelope = await createDocuSignEnvelope(pdfBytes, formData);
+        if (docusignEnvelope?.signingUrl) {
+          signatureLink = docusignEnvelope.signingUrl;
+        }
+      }
+      
+      // Fallback to demo signature link if DocuSign not available
+      if (!signatureLink) {
+        const invoiceId = generateInvoiceId();
+        signatureLink = generateSignatureLink(invoiceId);
+      }
+      
       setSignatureLink(signatureLink);
       
       // Generate email content
@@ -193,9 +216,22 @@ export default function InvoiceForm() {
       // Generate PDF
       const pdfBytes = await generateInvoicePDF(formData);
       
-      // Create signature link
-      const invoiceId = generateInvoiceId();
-      const signatureLink = generateSignatureLink(invoiceId);
+      let signatureLink = '';
+      
+      // Try to create DocuSign envelope if configured
+      if (isDocuSignConfigured()) {
+        const docusignEnvelope = await createDocuSignEnvelope(pdfBytes, formData);
+        if (docusignEnvelope?.signingUrl) {
+          signatureLink = docusignEnvelope.signingUrl;
+        }
+      }
+      
+      // Fallback to demo signature link if DocuSign not available
+      if (!signatureLink) {
+        const invoiceId = generateInvoiceId();
+        signatureLink = generateSignatureLink(invoiceId);
+      }
+      
       setSignatureLink(signatureLink);
       
       // Generate email template
@@ -244,14 +280,15 @@ export default function InvoiceForm() {
           type={type}
           value={isNumberField ? (formData[field] as number).toString() : formData[field] as string}
           onChange={(e) => {
+            const value = e.target.value;
             if (isNumberField) {
-              handleNumberInputChange(field, e.target.value);
+              handleNumberInputChange(field, value);
             } else {
-              handleStringInputChange(field, e.target.value);
+              handleStringInputChange(field, value);
             }
           }}
           placeholder={placeholder}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black ${
             errors[field] ? 'border-red-500' : 'border-gray-300'
           }`}
         />
@@ -419,7 +456,7 @@ export default function InvoiceForm() {
                 onChange={(e) => handleStringInputChange('notes', e.target.value)}
                 placeholder="Additional notes or terms..."
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               />
             </div>
           </div>

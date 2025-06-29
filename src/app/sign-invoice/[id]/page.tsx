@@ -73,7 +73,7 @@ export default function SignInvoicePage() {
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               placeholder="Enter your full name"
             />
           </div>
@@ -87,7 +87,7 @@ export default function SignInvoicePage() {
               value={clientEmail}
               onChange={(e) => setClientEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               placeholder="Enter your email address"
             />
           </div>
@@ -101,7 +101,7 @@ export default function SignInvoicePage() {
               onChange={(e) => setSignature(e.target.value)}
               required
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
               placeholder="Type your name or initials as your digital signature"
             />
             <p className="text-xs text-gray-500 mt-1">

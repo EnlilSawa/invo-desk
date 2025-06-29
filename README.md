@@ -7,7 +7,7 @@ A modern web application for freelancers to create professional invoices, send t
 - 📝 **Comprehensive Invoice Form** - Fill in client details, project information, and financial data
 - 📄 **Professional PDF Generation** - Clean, professional invoice PDFs using pdf-lib
 - 📧 **Simple Email Options** - Send invoices via EmailJS OR copy email templates
-- ✍️ **Digital Signatures** - Simple, secure signature collection (no external APIs)
+- ✍️ **Digital Signatures** - DocuSign integration OR simple local signatures
 - 🎨 **Modern UI** - Beautiful, responsive design with Tailwind CSS
 - 📱 **Mobile Friendly** - Works perfectly on all devices
 - 🚀 **Zero Configuration** - Works immediately without setup
@@ -17,7 +17,7 @@ A modern web application for freelancers to create professional invoices, send t
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS
 - **PDF Generation**: pdf-lib
 - **Email Service**: EmailJS (optional) + email templates
-- **Digital Signatures**: Simple local storage (no external APIs)
+- **Digital Signatures**: DocuSign API (optional) + simple local storage fallback
 
 ## Getting Started
 
@@ -82,6 +82,26 @@ If you want automatic email sending:
    ```
 
 **Note**: EmailJS is completely optional. You can use the "Copy Email" option to get email templates and send them manually.
+
+## DocuSign Setup (Optional)
+
+If you want professional digital signatures:
+
+1. Go to [DocuSign Developer Center](https://developers.docusign.com/) and create an account
+2. Create a new app and get your credentials:
+   - Account ID
+   - Integration Key
+   - User ID
+   - Private Key (RSA key pair)
+3. Create a `.env.local` file:
+   ```env
+   NEXT_PUBLIC_DOCUSIGN_ACCOUNT_ID=your_account_id
+   NEXT_PUBLIC_DOCUSIGN_INTEGRATION_KEY=your_integration_key
+   NEXT_PUBLIC_DOCUSIGN_USER_ID=your_user_id
+   NEXT_PUBLIC_DOCUSIGN_PRIVATE_KEY=your_private_key
+   ```
+
+**Note**: DocuSign is completely optional. The app will use a simple signature system if DocuSign is not configured.
 
 ## Project Structure
 
