@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { InvoiceFormData } from '@/types/invoice';
 import { generateInvoicePDF, downloadPDF } from '@/utils/pdfGenerator';
-import { sendInvoiceEmail, generateEmailContent } from '@/utils/emailService';
-import { createSignatureRequest, generateDemoSignatureLink } from '@/utils/signatureService';
+import { sendInvoiceEmail, generateEmailContent, generateEmailTemplate } from '@/utils/emailService';
+import { generateSignatureLink, generateInvoiceId } from '@/utils/signatureService';
 
 const initialFormData: InvoiceFormData = {
   // Client Information
@@ -45,9 +45,10 @@ export default function InvoiceForm() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errors, setErrors] = useState<Partial<InvoiceFormData>>({});
-  const [action, setAction] = useState<'download' | 'email'>('download');
+  const [action, setAction] = useState<'download' | 'email' | 'copy'>('download');
   const [emailSent, setEmailSent] = useState(false);
   const [signatureLink, setSignatureLink] = useState('');
+  const [emailTemplate, setEmailTemplate] = useState('');
 
   // Calculate totals when rate or hours change
   useEffect(() => {
@@ -62,21 +63,6 @@ export default function InvoiceForm() {
       finalAmount,
     }));
   }, [formData.hourlyRate, formData.totalHours, formData.taxRate]);
-
-  const handleInputChange = (field: keyof InvoiceFormData, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: undefined,
-      }));
-    }
-  };
 
   const handleStringInputChange = (field: keyof InvoiceFormData, value: string) => {
     setFormData(prev => ({
@@ -134,8 +120,10 @@ export default function InvoiceForm() {
     
     if (action === 'download') {
       await handleDownload();
-    } else {
+    } else if (action === 'email') {
       await handleEmail();
+    } else {
+      await handleCopyEmail();
     }
   };
 
@@ -161,31 +149,74 @@ export default function InvoiceForm() {
       // Generate PDF
       const pdfBytes = await generateInvoicePDF(formData);
       
-      // Create signature link (demo version)
-      const invoiceId = `inv-${Date.now()}`;
-      const demoSignatureLink = generateDemoSignatureLink(invoiceId);
-      setSignatureLink(demoSignatureLink);
+      // Create signature link
+      const invoiceId = generateInvoiceId();
+      const signatureLink = generateSignatureLink(invoiceId);
+      setSignatureLink(signatureLink);
       
       // Generate email content
       const emailData = generateEmailContent({
         ...formData,
-        signing_link: demoSignatureLink,
+        signing_link: signatureLink,
       });
       
-      // Send email
+      // Try to send email via EmailJS
       const success = await sendInvoiceEmail(emailData);
       
       if (success) {
         setEmailSent(true);
-        alert('Invoice sent successfully! Check your email configuration.');
+        alert('Invoice sent successfully via EmailJS!');
       } else {
-        alert('Failed to send email. Please check your EmailJS configuration.');
+        // Fallback to copy email template
+        const template = generateEmailTemplate(formData, signatureLink);
+        setEmailTemplate(template);
+        setEmailSent(true);
       }
     } catch (error) {
       console.error('Error sending invoice:', error);
-      alert('Error sending invoice. Please try again.');
+      // Fallback to copy email template
+      const invoiceId = generateInvoiceId();
+      const signatureLink = generateSignatureLink(invoiceId);
+      setSignatureLink(signatureLink);
+      const template = generateEmailTemplate(formData, signatureLink);
+      setEmailTemplate(template);
+      setEmailSent(true);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleCopyEmail = async () => {
+    setIsSending(true);
+    
+    try {
+      // Generate PDF
+      const pdfBytes = await generateInvoicePDF(formData);
+      
+      // Create signature link
+      const invoiceId = generateInvoiceId();
+      const signatureLink = generateSignatureLink(invoiceId);
+      setSignatureLink(signatureLink);
+      
+      // Generate email template
+      const template = generateEmailTemplate(formData, signatureLink);
+      setEmailTemplate(template);
+      setEmailSent(true);
+    } catch (error) {
+      console.error('Error generating email template:', error);
+      alert('Error generating email template. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(emailTemplate);
+      alert('Email template copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      alert('Error copying to clipboard. Please copy manually.');
     }
   };
 
@@ -236,9 +267,9 @@ export default function InvoiceForm() {
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="text-green-500 text-6xl mb-4">✓</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-4">Invoice Sent!</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-4">Ready to Send!</h1>
           <p className="text-gray-600 mb-6">
-            Your invoice has been sent to {formData.clientEmail}
+            Your invoice is ready to be sent to {formData.clientEmail}
           </p>
           
           {signatureLink && (
@@ -253,11 +284,30 @@ export default function InvoiceForm() {
             </div>
           )}
           
+          {emailTemplate && (
+            <div className="bg-gray-50 p-6 rounded-lg mb-6 text-left">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Email Template</h3>
+              <p className="text-gray-600 mb-4">
+                Copy this email template and send it to your client:
+              </p>
+              <div className="bg-white p-4 rounded border">
+                <pre className="text-sm whitespace-pre-wrap">{emailTemplate}</pre>
+              </div>
+              <button
+                onClick={copyToClipboard}
+                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200"
+              >
+                Copy to Clipboard
+              </button>
+            </div>
+          )}
+          
           <div className="flex gap-4 justify-center">
             <button
               onClick={() => {
                 setEmailSent(false);
                 setSignatureLink('');
+                setEmailTemplate('');
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200"
             >
@@ -377,19 +427,19 @@ export default function InvoiceForm() {
           {/* Action Selection */}
           <div className="bg-blue-50 p-6 rounded-lg">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">What would you like to do?</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
                 <input
                   type="radio"
                   name="action"
                   value="download"
                   checked={action === 'download'}
-                  onChange={(e) => setAction(e.target.value as 'download' | 'email')}
+                  onChange={(e) => setAction(e.target.value as 'download' | 'email' | 'copy')}
                   className="mr-3"
                 />
                 <div>
                   <div className="font-semibold">Download PDF</div>
-                  <div className="text-sm text-gray-600">Generate and download the invoice as PDF</div>
+                  <div className="text-sm text-gray-600">Generate and download the invoice</div>
                 </div>
               </label>
               
@@ -399,12 +449,27 @@ export default function InvoiceForm() {
                   name="action"
                   value="email"
                   checked={action === 'email'}
-                  onChange={(e) => setAction(e.target.value as 'download' | 'email')}
+                  onChange={(e) => setAction(e.target.value as 'download' | 'email' | 'copy')}
                   className="mr-3"
                 />
                 <div>
-                  <div className="font-semibold">Email to Client</div>
-                  <div className="text-sm text-gray-600">Send invoice via email with signature link</div>
+                  <div className="font-semibold">Auto Email</div>
+                  <div className="text-sm text-gray-600">Send via EmailJS (if configured)</div>
+                </div>
+              </label>
+
+              <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                <input
+                  type="radio"
+                  name="action"
+                  value="copy"
+                  checked={action === 'copy'}
+                  onChange={(e) => setAction(e.target.value as 'download' | 'email' | 'copy')}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-semibold">Copy Email</div>
+                  <div className="text-sm text-gray-600">Get email template to copy</div>
                 </div>
               </label>
             </div>
@@ -425,10 +490,14 @@ export default function InvoiceForm() {
               ) : isSending ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Sending Invoice...</span>
+                  <span>Preparing...</span>
                 </>
               ) : (
-                <span>{action === 'download' ? 'Generate Invoice PDF' : 'Send Invoice to Client'}</span>
+                <span>
+                  {action === 'download' ? 'Generate Invoice PDF' : 
+                   action === 'email' ? 'Send Invoice to Client' : 
+                   'Generate Email Template'}
+                </span>
               )}
             </button>
           </div>

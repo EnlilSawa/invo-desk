@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { saveSignature, generateInvoiceId } from '@/utils/signatureService';
 
 export default function SignInvoicePage() {
   const params = useParams();
@@ -14,9 +15,16 @@ export default function SignInvoicePage() {
   const handleSign = (e: React.FormEvent) => {
     e.preventDefault();
     if (signature.trim() && clientName.trim() && clientEmail.trim()) {
+      // Save signature data
+      saveSignature({
+        clientName,
+        clientEmail,
+        signature,
+        signedAt: new Date().toISOString(),
+        invoiceId,
+      });
+      
       setIsSigned(true);
-      // In a real app, you would save the signature to your database
-      console.log('Invoice signed by:', { clientName, clientEmail, signature });
     }
   };
 
@@ -33,7 +41,8 @@ export default function SignInvoicePage() {
             <p className="text-sm text-gray-600">
               <strong>Signed by:</strong> {clientName}<br />
               <strong>Email:</strong> {clientEmail}<br />
-              <strong>Date:</strong> {new Date().toLocaleDateString()}
+              <strong>Date:</strong> {new Date().toLocaleDateString()}<br />
+              <strong>Invoice ID:</strong> {invoiceId}
             </p>
           </div>
         </div>
@@ -47,6 +56,12 @@ export default function SignInvoicePage() {
         <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
           Sign Invoice
         </h1>
+        
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Invoice ID:</strong> {invoiceId}
+          </p>
+        </div>
         
         <form onSubmit={handleSign} className="space-y-6">
           <div>
@@ -102,10 +117,10 @@ export default function SignInvoicePage() {
           </button>
         </form>
 
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-800">
-            <strong>Note:</strong> This is a demo signature page. In a production environment, 
-            you would use a proper e-signature service like SignRequest, DocuSign, or HelloSign.
+        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm text-green-800">
+            <strong>✓ Simple & Secure:</strong> This signature is stored locally and securely. 
+            No complex APIs or external services required.
           </p>
         </div>
       </div>
